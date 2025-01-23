@@ -1,5 +1,5 @@
 {
-  "name": "@mjh-element/prm",
+  "name": "@parker-stovall/prm",
   "version": "1.0.0",
   "type": "module",
   "bin": {
@@ -7,7 +7,9 @@
   },
   "scripts": {
     "lint": "eslint ./cli",
-    "build": "rm -rf dist && tsc"
+    "build": "rm -rf dist && tsc",
+    "start": "node dist/prm.js",
+    "reinstall": "npm run build && npm uninstall -g @parker-stovall/prm && npm install -g ."
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

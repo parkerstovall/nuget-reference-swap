@@ -1,4 +1,5 @@
 #! /usr/bin/env node
+
 import "dotenv/config";
 import * as commander from "commander";
 import { Swap } from "./commands/Swap.js";
