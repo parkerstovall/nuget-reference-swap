@@ -73,15 +73,52 @@ export function tryFindDllFile(
   return null;
 }
 
-export function tryFindSlnFile(projectPath: string) {
-  const files = fs.readdirSync(projectPath);
-  const slnFiles = files.filter((file) => file.endsWith(".sln"));
+export function tryFindProjectListFromSlnFile(
+  projectPath: string,
+  filePath: string
+) {
+  let content = "";
+  const slnPath = path.join(projectPath, filePath);
+  if (slnPath.endsWith(".sln")) {
+    if (!fs.existsSync(slnPath)) {
+      return null;
+    }
 
-  if (slnFiles.length === 0) {
+    content = fs.readFileSync(slnPath, "utf8");
+  } else {
+    const files = fs.readdirSync(slnPath);
+    const slnFile = files.find((file) => file.endsWith(".sln"));
+    if (!slnFile) {
+      return null;
+    }
+
+    content = fs.readFileSync(path.join(slnPath, slnFile), "utf8");
+  }
+
+  const projects = content.match(/Project.* = "(.*?)", "(.*?)"/g);
+  if (!projects) {
     return null;
   }
 
-  return path.join(projectPath, slnFiles[0]);
+  const projectPaths = projects
+    .map((project) => {
+      const match = project.match(/Project.* = "(.*?)", "(.*?)"/);
+      if (!match) {
+        return null;
+      }
+
+      const projectPath = match[2].replace(/\\/g, "/");
+      const fullPath = path.join(slnPath.replace(".sln", ""), projectPath);
+
+      return {
+        name: match[1],
+        projectPath,
+        fullPath,
+      };
+    })
+    .filter((project) => project !== null);
+
+  return projectPaths;
 }
 
 export function getDirectories(source: string): string[] {
