@@ -12,17 +12,15 @@ type SwapOptions = {
 export function Swap() {
   const swap = new commander.Command("swap");
   swap
-    .description(
-      "CLI for swapping package references between local and nuget sources to facilitate development."
-    )
+    .description("Swap package references between local and nuget sources")
     .requiredOption(
       "-s, --source <source>",
-      "Source to swap to (l, local or n, nuget)."
+      "(Required) Source to swap to (l, local or n, nuget)."
     )
-    .requiredOption("-f, --file <file>", "Path to the solution file.")
+    .requiredOption("-f, --file <file>", "(Required) Path to the solution file")
     .requiredOption(
       "-n --name <name>",
-      "Name of the project to swap. Use list command to find available options"
+      "(Required) Name of the project to swap. Use list command to find available options"
     )
     .option(
       "-v --version <version>",
