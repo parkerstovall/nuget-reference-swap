@@ -73,6 +73,17 @@ export function tryFindDllFile(
   return null;
 }
 
+export function tryFindSlnFile(projectPath: string) {
+  const files = fs.readdirSync(projectPath);
+  const slnFiles = files.filter((file) => file.endsWith(".sln"));
+
+  if (slnFiles.length === 0) {
+    return null;
+  }
+
+  return path.join(projectPath, slnFiles[0]);
+}
+
 export function getDirectories(source: string): string[] {
   return fs.readdirSync(source).filter((name) => {
     return fs.statSync(path.join(source, name)).isDirectory();

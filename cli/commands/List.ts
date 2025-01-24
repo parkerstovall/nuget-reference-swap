@@ -9,7 +9,6 @@ import {
 
 type ListOptions = {
   query?: string;
-  verify?: string;
   prefix?: string;
 };
 
@@ -17,12 +16,7 @@ export function List() {
   const list = new commander.Command("list");
   list
     .description("List all packages available to swap between local and nuget")
-    .option("-q --query <query>", "Query to filter packages")
-    .option(
-      "-v --verify <verify>",
-      "Check for availability at the projectPath specified in .env (true or false)",
-      "true"
-    )
+    .option("-q --query <query>", "Keyword to search through nuget feed")
     .option("-p --prefix <prefix>", "Prefix to add to the project name")
     .action(ListPackages);
 
@@ -88,16 +82,14 @@ async function ListPackages(options: ListOptions, command: commander.Command) {
   }
 
   let directories: string[] = [];
-  if (options.verify === "true") {
-    const paths = process.env.LOCAL_PACKAGE_PATH?.split(",") || [];
-    if (paths.length === 0) {
-      command.error(colors.red("projectPath is not set in .env file"));
-    }
+  const paths = process.env.LOCAL_PACKAGE_PATH?.split(",") || [];
+  if (paths.length === 0) {
+    command.error(colors.red("projectPath is not set in .env file"));
+  }
 
-    // Get List of directories at path
-    for (const path of paths) {
-      directories = [...getDirectories(path), ...directories];
-    }
+  // Get List of directories at path
+  for (const path of paths) {
+    directories = [...getDirectories(path), ...directories];
   }
 
   console.log(colors.green("Available packages:"));
@@ -127,8 +119,6 @@ async function ListPackages(options: ListOptions, command: commander.Command) {
       }
     }
 
-    if (options.verify === "true") {
-      verifyProjectDirectory(row.title, options.prefix);
-    }
+    verifyProjectDirectory(row.title, options.prefix);
   }
 }

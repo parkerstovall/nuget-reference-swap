@@ -15,7 +15,7 @@ export function Swap() {
     .description("Swap package references between local and nuget sources")
     .requiredOption(
       "-s, --source <source>",
-      "(Required) Source to swap to (l, local or n, nuget)."
+      "(Required) Source to swap to <l, local> or <n, nuget>"
     )
     .requiredOption("-f, --file <file>", "(Required) Path to the solution file")
     .requiredOption(
@@ -29,7 +29,7 @@ export function Swap() {
     )
     .option(
       "-p --prefix <prefix>",
-      "Prefix for the project name when searching through the path"
+      "Prefix for the directory name when searching through the path"
     )
     .action(SwapCommand);
 
@@ -44,18 +44,12 @@ function verifyOptions(options: SwapOptions, command: commander.Command) {
         "Invalid value for source. Supported Values: {'l', 'local', 'n', 'nuget'}"
       )
     );
-
-    return false;
   }
-
-  return true;
 }
 
 function SwapCommand(options: SwapOptions, command: commander.Command) {
   options.source = options.source.toLocaleLowerCase();
-  if (!verifyOptions(options, command)) {
-    return;
-  }
+  verifyOptions(options, command);
 
   console.log("Swapping...");
 }
