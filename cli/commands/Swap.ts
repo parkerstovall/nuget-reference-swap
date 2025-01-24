@@ -90,8 +90,6 @@ function SwapCommand(options: SwapOptions, command: commander.Command) {
 
     if (options.source === "l" || options.source === "local") {
       content = content.replace(regex, "");
-
-      console.log(content.indexOf("</Project>"));
       content = content.replace(
         "</Project>",
         `
