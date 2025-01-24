@@ -4,8 +4,9 @@ import colors from "colors";
 type SwapOptions = {
   source: string;
   file: string;
-  project: string;
+  name: string;
   version: string;
+  prefix?: string;
 };
 
 export function Swap() {
@@ -20,13 +21,17 @@ export function Swap() {
     )
     .requiredOption("-f, --file <file>", "Path to the solution file.")
     .requiredOption(
-      "-p --project <project>",
+      "-n --name <name>",
       "Name of the project to swap. Use list command to find available options"
     )
     .option(
       "-v --version <version>",
       "Version of the package to swap.",
       "@Latest"
+    )
+    .option(
+      "-p --prefix <prefix>",
+      "Prefix for the project name when searching through the path"
     )
     .action(SwapCommand);
 
