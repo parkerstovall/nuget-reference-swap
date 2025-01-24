@@ -1,7 +1,11 @@
 import * as commander from "commander";
-import * as fs from "fs";
-import * as path from "path";
 import colors from "colors";
+import {
+  getDirectories,
+  tryFindCsProjFile,
+  tryFindDllFile,
+  tryFindTargetFramework,
+} from "../Helpers/FileHelpers.js";
 
 type ListOptions = {
   query?: string;
@@ -25,85 +29,7 @@ export function List() {
   return list;
 }
 
-function getDirectories(source: string): string[] {
-  return fs.readdirSync(source).filter((name) => {
-    return fs.statSync(path.join(source, name)).isDirectory();
-  });
-}
-
-function tryFindCsProjFile(
-  projectPath: string,
-  directory: string,
-  projectName: string
-) {
-  // Try to find the csproj file in the root of the project
-  let csprojFile = path.join(projectPath, directory, projectName + ".csproj");
-  if (fs.existsSync(csprojFile)) {
-    return csprojFile;
-  }
-
-  // Try to find the csproj file in the project directory
-  csprojFile = path.join(
-    projectPath,
-    directory,
-    projectName,
-    projectName + ".csproj"
-  );
-
-  if (fs.existsSync(csprojFile)) {
-    return csprojFile;
-  }
-
-  return null;
-}
-
-function tryFindDllFile(
-  projectPath: string,
-  projectName: string,
-  directory: string,
-  targetFramework: string
-) {
-  let dllPath = path.join(
-    projectPath,
-    directory,
-    "bin",
-    "Debug",
-    targetFramework,
-    projectName + ".dll"
-  );
-
-  if (fs.existsSync(dllPath)) {
-    return dllPath;
-  }
-
-  let releaseDllPath = dllPath.replace("Debug", "Release");
-  if (fs.existsSync(releaseDllPath)) {
-    return releaseDllPath;
-  }
-
-  dllPath = path.join(
-    projectPath,
-    directory,
-    projectName,
-    "bin",
-    "Debug",
-    targetFramework,
-    projectName + ".dll"
-  );
-
-  if (fs.existsSync(dllPath)) {
-    return dllPath;
-  }
-
-  releaseDllPath = dllPath.replace("Debug", "Release");
-  if (fs.existsSync(releaseDllPath)) {
-    return releaseDllPath;
-  }
-
-  return null;
-}
-
-function lookForDllInDirectory(projectName: string, prefix?: string) {
+function verifyProjectDirectory(projectName: string, prefix?: string) {
   const directory = (prefix || "") + projectName;
   const projectPaths = process.env.LOCAL_PACKAGE_PATH?.split(",") || [];
   let found = false;
@@ -113,16 +39,13 @@ function lookForDllInDirectory(projectName: string, prefix?: string) {
       continue;
     }
 
-    const source = fs.readFileSync(csprojFile, "utf8");
-    const targetFrameworkMatch = source.match(
-      /<TargetFramework>(.*?)<\/TargetFramework>/
-    );
+    console.log(colors.green(`  - Found .csproj file at ${csprojFile}`));
 
-    if (!targetFrameworkMatch) {
+    const targetFramework = tryFindTargetFramework(csprojFile);
+    if (!targetFramework) {
       console.log(colors.red(`  - No target framework found in ${csprojFile}`));
       continue;
     }
-    const targetFramework = targetFrameworkMatch[1];
 
     const dllPath = tryFindDllFile(
       projectPath,
@@ -139,7 +62,7 @@ function lookForDllInDirectory(projectName: string, prefix?: string) {
   }
 
   if (!found && prefix) {
-    lookForDllInDirectory(projectName);
+    verifyProjectDirectory(projectName);
   } else if (!found) {
     console.log(colors.red(`  - No dll found on project path`));
   }
@@ -205,7 +128,7 @@ async function ListPackages(options: ListOptions, command: commander.Command) {
     }
 
     if (options.verify === "true") {
-      lookForDllInDirectory(row.title, options.prefix);
+      verifyProjectDirectory(row.title, options.prefix);
     }
   }
 }

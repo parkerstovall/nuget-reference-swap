@@ -38,8 +38,7 @@ export function Swap() {
   return swap;
 }
 
-function SwapCommand(options: SwapOptions, command: commander.Command) {
-  options.source = options.source.toLocaleLowerCase();
+function verifyOptions(options: SwapOptions, command: commander.Command) {
   const acceptedSources = ["l", "n", "local", "nuget"];
   if (!acceptedSources.includes(options.source)) {
     command.error(
@@ -47,5 +46,18 @@ function SwapCommand(options: SwapOptions, command: commander.Command) {
         "Invalid value for source. Supported Values: {'l', 'local', 'n', 'nuget'}"
       )
     );
+
+    return false;
   }
+
+  return true;
+}
+
+function SwapCommand(options: SwapOptions, command: commander.Command) {
+  options.source = options.source.toLocaleLowerCase();
+  if (!verifyOptions(options, command)) {
+    return;
+  }
+
+  console.log("Swapping...");
 }
