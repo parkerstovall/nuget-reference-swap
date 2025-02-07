@@ -2,7 +2,7 @@ import * as fs from 'fs'
 import path from 'path'
 import { getCsProjFromXml } from './XMLHelpers.js'
 
-export function tryFindCsProjFile(directory: string, projectName: string) {
+export function tryFindCsProjFile(projectName: string, directory: string) {
   // Try to find the csproj file in the root of the project
   let csprojFile = path.join(directory, projectName + '.csproj')
   if (fs.existsSync(csprojFile)) {
@@ -21,16 +21,19 @@ export function tryFindCsProjFile(directory: string, projectName: string) {
 
 function normalizePath(projectPath: string) {
   if (path.isAbsolute(projectPath)) {
-    return projectPath
+    return projectPath.trim()
   }
 
-  const repoDir = path.resolve(import.meta.dirname, '../../')
+  const repoDir = path.resolve(import.meta.dirname, '../../').trim()
   return path.resolve(repoDir, projectPath)
 }
 
 export function getNormalizedPaths() {
   const paths = process.env.LOCAL_PACKAGE_PATH?.split(',') || []
   const newPaths = paths.map(normalizePath)
+
+  // Account for absolute pathing
+  //newPaths.push("/")
   return newPaths
 }
 
@@ -85,11 +88,12 @@ export function tryFindProjectListFromSlnFile(
 ) {
   let content = ''
   const slnPath = path.join(projectPath, filePath)
-  if (slnPath.endsWith('.sln')) {
-    if (!fs.existsSync(slnPath)) {
-      return null
-    }
+  
+  if (!fs.existsSync(slnPath)) {
+    return null
+  }
 
+  if (slnPath.endsWith('.sln')) {
     content = fs.readFileSync(slnPath, 'utf8')
   } else {
     const files = fs.readdirSync(slnPath)
@@ -98,7 +102,12 @@ export function tryFindProjectListFromSlnFile(
       return null
     }
 
-    content = fs.readFileSync(path.join(slnPath, slnFile), 'utf8')
+    const newFilePath = path.join(slnPath, slnFile)
+    if (!fs.existsSync(newFilePath)) {
+      return null
+    }
+
+    content = fs.readFileSync(newFilePath, 'utf8')
   }
 
   const projects = content.match(/Project.* = "(.*?)", "(.*?)"/g)
@@ -114,8 +123,7 @@ export function tryFindProjectListFromSlnFile(
       }
 
       const projectPath = match[2].replace(/\\/g, '/')
-      const fullPath = path.join(slnPath.replace('.sln', ''), projectPath)
-
+      const fullPath = path.join(slnPath.replace('.sln', ''), '../', projectPath)
       return {
         name: match[1],
         projectPath,
@@ -138,19 +146,19 @@ export function tryFindTargetFramework(csprojPath: string) {
   return csProj.Project.PropertyGroup.TargetFramework
 }
 
-export function searchForDllRecusive(projectName: string, maxLevel: number) {
+export function searchForCsProjRecursive(projectName: string, maxLevel: number) {
   const projectPaths = getNormalizedPaths()
   for (const projectPath of projectPaths) {
-    const dllPath = searchForDllRecusiveLoop(projectName, projectPath, maxLevel)
-    if (dllPath) {
-      return dllPath
+    const csProjFile = searchForCsProjRecursiveLoop(projectName, projectPath, maxLevel)
+    if (csProjFile) {
+      return csProjFile
     }
   }
 
   return null
 }
 
-function searchForDllRecusiveLoop(
+function searchForCsProjRecursiveLoop(
   projectName: string,
   currDirectory: string,
   maxLevel: number,
@@ -161,26 +169,26 @@ function searchForDllRecusiveLoop(
     (maxLevel !== -1 && currentLevel >= maxLevel) ||
     directories.length === 0
   ) {
-    return searchDirectoryForProjectDll(projectName, currDirectory)
+    return tryFindCsProjFile(projectName, currDirectory)
   }
 
   const len = directories.length
   let i = 0
   for (i = 0; i < len; i++) {
     const directory = path.join(currDirectory, directories[i])
-    let dllPath = searchDirectoryForProjectDll(projectName, directory)
-    if (dllPath) {
-      return dllPath
+    let csProjFile = tryFindCsProjFile(projectName, directory)
+    if (csProjFile) {
+      return csProjFile
     }
 
-    dllPath = searchForDllRecusiveLoop(
+    csProjFile = searchForCsProjRecursiveLoop(
       projectName,
       directory,
       maxLevel,
       currentLevel + 1,
     )
-    if (dllPath) {
-      return dllPath
+    if (csProjFile) {
+      return csProjFile
     }
   }
 

@@ -1,8 +1,7 @@
 import * as commander from 'commander'
 import colors from 'colors'
 import {
-  searchForDllRecusive,
-  searchProjectPathForDll,
+  searchForCsProjRecursive,
 } from '../Helpers/FileHelpers.js'
 
 type ListOptions = {
@@ -49,16 +48,12 @@ async function ListPackages(options: ListOptions, command: commander.Command) {
   for (const row of data.data) {
     console.log(row.title)
     if (row.title === 'DbLocator') continue
-    let dllPath = searchProjectPathForDll(row.title)
+    const csproj = searchForCsProjRecursive(row.title, options.recursionLevel ?? 0)
 
-    if (!dllPath && options.recursionLevel) {
-      dllPath = searchForDllRecusive(row.title, options.recursionLevel)
-    }
-
-    if (dllPath) {
-      console.log(colors.green(`  - Found dll at ${dllPath}`))
+    if (csproj) {
+      console.log(colors.green(`  - Found csproj at ${csproj}`))
     } else {
-      command.error(colors.red(`  - No dll found on project path`))
+      command.error(colors.red(`  - No csproj found on project path`))
     }
   }
 }

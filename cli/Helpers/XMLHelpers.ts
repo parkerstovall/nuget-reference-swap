@@ -7,12 +7,13 @@ export type PackageReference = {
 }
 
 export type ProjectReference = {
-  '@_Include': string
+  '@_Include': string,
+  "HintPath": string
 }
 
 export type ItemGroup = {
   PackageReference?: PackageReference | PackageReference[]
-  ProjectReference?: ProjectReference | ProjectReference[]
+  Reference?: ProjectReference | ProjectReference[]
 }
 
 type PropertyGroup = {
@@ -31,6 +32,7 @@ const xmlParserOptions = {
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
   allowBooleanAttributes: true,
+  format: true
 }
 
 export function getCsProjFromXml(filePath: string) {

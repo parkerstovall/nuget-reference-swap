@@ -3,15 +3,11 @@ import * as fs from 'fs'
 import colors from 'colors'
 import {
   getNormalizedPaths,
-  searchForDllRecusive,
+  searchForCsProjRecursive,
   tryFindProjectListFromSlnFile,
 } from '../Helpers/FileHelpers.js'
-import {
-  csProjectXml,
-  getCsProjFromXml,
-  getXmlFromJsObject,
-  ItemGroup,
-} from '../Helpers/XMLHelpers.js'
+import path from 'path'
+import { execSync } from 'child_process'
 
 type SwapOptions = {
   source: string
@@ -81,100 +77,92 @@ function verifyOptions(options: SwapOptions, command: commander.Command) {
   }
 }
 
-function swapLocal(
-  parsedContent: csProjectXml,
-  options: SwapOptions,
-  dllPath: string,
-) {
-  let itemGroups = parsedContent.Project.ItemGroup
-  if (!Array.isArray(itemGroups)) {
-    itemGroups = [itemGroups]
-  }
+// function swapLocal(
+//   parsedContent: csProjectXml,
+//   options: SwapOptions//,
+//   //packagePath: string,
+// ) {
+//   let itemGroups = parsedContent.Project.ItemGroup
+//   if (!Array.isArray(itemGroups)) {
+//     itemGroups = [itemGroups]
+//   }
 
-  let foundLocal = false
-  itemGroups.map((itemGroup: ItemGroup) => {
-    itemGroup = tryRemovePackageReference(itemGroup, options.name)
-    if (itemGroup.ProjectReference) {
-      foundLocal = true
-      itemGroup = tryAddLocalReference(itemGroup, dllPath)
-    }
+//   let foundLocal = false
+//   itemGroups.map((itemGroup: ItemGroup) => {
+//     if (itemGroup.PackageReference) {
+//       foundLocal = true
+//       itemGroup = tryRemovePackageReference(itemGroup, options.name)
+//     }
 
-    return itemGroup
-  })
+//     return itemGroup
+//   })
+  
+//   if(foundLocal) {
+//     //installPackage(packagePath)
+//   }
 
-  if (!foundLocal) {
-    itemGroups.push({
-      ProjectReference: {
-        '@_Include': dllPath,
-      },
-    })
-  }
+//   parsedContent.Project.ItemGroup = itemGroups
+//   return parsedContent
+// }
 
-  parsedContent.Project.ItemGroup = itemGroups
-  return parsedContent
-}
+// function tryRemovePackageReference(itemGroup: ItemGroup, packageName: string) {
+//   if (!itemGroup.PackageReference) {
+//     return itemGroup
+//   }
 
-function tryRemovePackageReference(itemGroup: ItemGroup, packageName: string) {
-  if (!itemGroup.PackageReference) {
-    return itemGroup
-  }
+//   if (!Array.isArray(itemGroup.PackageReference)) {
+//     itemGroup.PackageReference = [itemGroup.PackageReference]
+//   }
 
-  if (!Array.isArray(itemGroup.PackageReference)) {
-    itemGroup.PackageReference = [itemGroup.PackageReference]
-  }
+//   itemGroup.PackageReference = itemGroup.PackageReference.filter(
+//     (packageReference) => {
+//       return (
+//         packageReference['@_Include'].toLowerCase() !==
+//         packageName.toLowerCase()
+//       )
+//     },
+//   )
 
-  itemGroup.PackageReference = itemGroup.PackageReference.filter(
-    (packageReference) => {
-      return (
-        packageReference['@_Include'].toLowerCase() !==
-        packageName.toLowerCase()
-      )
-    },
-  )
-
-  return itemGroup
-}
-
-function tryAddLocalReference(itemGroup: ItemGroup, dllPath: string) {
-  if (!itemGroup.ProjectReference) {
-    return itemGroup
-  }
-
-  if (!Array.isArray(itemGroup.ProjectReference)) {
-    itemGroup.ProjectReference = [itemGroup.ProjectReference]
-  }
-
-  itemGroup.ProjectReference.push({
-    '@_Include': dllPath,
-  })
-
-  return itemGroup
-}
+//   return itemGroup
+// }
 
 function SwapCommand(options: SwapOptions, command: commander.Command) {
   options.source = options.source.toLocaleLowerCase()
+  options.file = options.file.trim()
   verifyOptions(options, command)
 
+  //dotnet pack Locator --include-symbols -o out --include-source   
   const projectList = getListOfProjects(options.file, command)
-  const dllPath = searchForDllRecusive(options.name, options.recursionLevel)
-  if (!dllPath) {
+  const csprojFile = searchForCsProjRecursive(options.name, 2)
+  if (!csprojFile) {
     command.error(
       colors.red(
-        'No DLL file found with that project name. Use the list command to debug',
+        'No csproj file found with that project name. Use the list command to debug',
       ),
     )
   }
+
+  makeNugetPackage(csprojFile)
 
   for (const project of projectList) {
     if (!fs.existsSync(project.fullPath)) {
       command.error(colors.red(`File not found at ${project.fullPath}`))
     }
-    let parsedContent = getCsProjFromXml(project.fullPath)
-    if (options.source === 'l' || options.source === 'local') {
-      parsedContent = swapLocal(parsedContent, options, dllPath)
-    }
 
-    const newContent = getXmlFromJsObject(parsedContent)
-    fs.writeFileSync(project.fullPath, newContent)
+    execSync(`dotnet add ${project.fullPath} package ${options.name} --source out`)
+
+    // let parsedContent = getCsProjFromXml(project.fullPath)
+    // if (options.source === 'l' || options.source === 'local') {
+    //   parsedContent = swapLocal(parsedContent, options, 'packagePath')
+    // }
+
+    // const newContent = getXmlFromJsObject(parsedContent)
+    // fs.writeFileSync(project.fullPath, newContent)
   }
+}
+
+function makeNugetPackage(csProj: string) {
+  const projectPath = path.join(csProj, '../')
+  execSync(`dotnet nuget add source out`)
+  execSync(`dotnet pack ${projectPath} --include-symbols -o out --include-source`)
 }
