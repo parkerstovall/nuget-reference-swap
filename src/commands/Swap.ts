@@ -7,7 +7,8 @@ import {
   tryFindProjectListFromSlnFile,
 } from '../Helpers/FileHelpers'
 import path from 'path'
-import { execSync } from 'child_process'
+import { getCsProjFromXml } from '../Helpers/XMLHelpers'
+import { execWrapper } from '../Helpers/ExecWrapper'
 
 type SwapOptions = {
   source: string
@@ -77,55 +78,6 @@ function verifyOptions(options: SwapOptions, command: commander.Command) {
   }
 }
 
-// function swapLocal(
-//   parsedContent: csProjectXml,
-//   options: SwapOptions//,
-//   //packagePath: string,
-// ) {
-//   let itemGroups = parsedContent.Project.ItemGroup
-//   if (!Array.isArray(itemGroups)) {
-//     itemGroups = [itemGroups]
-//   }
-
-//   let foundLocal = false
-//   itemGroups.map((itemGroup: ItemGroup) => {
-//     if (itemGroup.PackageReference) {
-//       foundLocal = true
-//       itemGroup = tryRemovePackageReference(itemGroup, options.name)
-//     }
-
-//     return itemGroup
-//   })
-
-//   if(foundLocal) {
-//     //installPackage(packagePath)
-//   }
-
-//   parsedContent.Project.ItemGroup = itemGroups
-//   return parsedContent
-// }
-
-// function tryRemovePackageReference(itemGroup: ItemGroup, packageName: string) {
-//   if (!itemGroup.PackageReference) {
-//     return itemGroup
-//   }
-
-//   if (!Array.isArray(itemGroup.PackageReference)) {
-//     itemGroup.PackageReference = [itemGroup.PackageReference]
-//   }
-
-//   itemGroup.PackageReference = itemGroup.PackageReference.filter(
-//     (packageReference) => {
-//       return (
-//         packageReference['@_Include'].toLowerCase() !==
-//         packageName.toLowerCase()
-//       )
-//     },
-//   )
-
-//   return itemGroup
-// }
-
 function SwapCommand(options: SwapOptions, command: commander.Command) {
   options.source = options.source.toLocaleLowerCase()
   options.file = options.file.trim()
@@ -141,36 +93,90 @@ function SwapCommand(options: SwapOptions, command: commander.Command) {
     )
   }
 
-  makeNugetPackage(csprojFile)
+  const [pkgSource, pkgName] = makeNugetPackage(options.name, csprojFile)
 
   for (const project of projectList) {
+    let found = false
     if (!fs.existsSync(project.fullPath)) {
       command.error(colors.red(`File not found at ${project.fullPath}`))
     }
 
-    execSync(
-      `dotnet add ${project.fullPath} package ${options.name} --source out`,
+    const parsedContent = getCsProjFromXml(project.fullPath)
+    let itemGroups = parsedContent.Project.ItemGroup
+    if (!Array.isArray(itemGroups)) {
+      itemGroups = [itemGroups]
+    }
+
+    for (const itemGroup of itemGroups) {
+      if (itemGroup.PackageReference) {
+        if (!Array.isArray(itemGroup.PackageReference)) {
+          itemGroup.PackageReference = [itemGroup.PackageReference]
+        }
+
+        for (const pkg of itemGroup.PackageReference) {
+          if (pkg['@_Include'] === options.name) {
+            found = true
+            break
+          }
+        }
+      }
+      if (found) {
+        break
+      }
+    }
+
+    if (!found) {
+      continue
+    }
+
+    execWrapper(`dotnet remove ${project.fullPath} package ${options.name}`)
+
+    execWrapper(
+      `dotnet add ${project.fullPath} package ${pkgName} --source ${pkgSource} --version 1.0.0`,
     )
 
-    // let parsedContent = getCsProjFromXml(project.fullPath)
-    // if (options.source === 'l' || options.source === 'local') {
-    //   parsedContent = swapLocal(parsedContent, options, 'packagePath')
-    // }
-
-    // const newContent = getXmlFromJsObject(parsedContent)
-    // fs.writeFileSync(project.fullPath, newContent)
+    execWrapper(`dotnet restore ${project.fullPath}`)
   }
+
+  execWrapper('dotnet nuget locals all --clear')
 }
 
-function makeNugetPackage(csProj: string) {
+function makeNugetPackage(name: string, csProj: string) {
   const projectPath = path.join(csProj, '../')
-  const sources = execSync(`dotnet nuget list source`).toString()
+  const sources = execWrapper(`dotnet nuget list source`).toString()
+  const outPath = path.join(__dirname, '../', '../', 'out')
   if (!sources.includes('LocalPRM_CLI')) {
-    execSync(`dotnet nuget add source ./out --name LocalPRM_CLI`)
+    execWrapper(`dotnet nuget add source ${outPath}`)
   }
 
-  execSync(`dotnet build ${projectPath} --configuration Release`)
-  execSync(
-    `dotnet pack ${projectPath} --configuration Release --include-symbols --include-source -o ./out`,
+  try {
+    execWrapper(`dotnet build ${projectPath}`)
+  } catch {
+    console.log(colors.red('Build failed.'))
+    process.exit(1)
+  }
+
+  const pkgPath = path.join(outPath, `${name}_LocalPRM_CLI.1.0.0.nupkg`)
+  if (fs.existsSync(pkgPath)) {
+    fs.rmSync(pkgPath)
+  }
+
+  const symbPath = path.join(
+    outPath,
+    `${name}_LocalPRM_CLI.1.0.0.symbols.nupkg`,
   )
+  if (fs.existsSync(symbPath)) {
+    fs.rmSync(symbPath)
+  }
+
+  try {
+    execWrapper(
+      `dotnet pack ${projectPath} --configuration Debug --include-symbols --include-source -o ${outPath} -p:PackageVersion=1.0.0 -p:PackageID=${name}_LocalPRM_CLI`,
+    )
+  } catch {
+    console.log(colors.red('Pack failed.'))
+    process.exit(1)
+  }
+
+  return [outPath, `${name}_LocalPRM_CLI`]
 }
