@@ -7,8 +7,8 @@ export type PackageReference = {
 }
 
 export type ProjectReference = {
-  '@_Include': string,
-  "HintPath": string
+  '@_Include': string
+  HintPath: string
 }
 
 export type ItemGroup = {
@@ -32,7 +32,7 @@ const xmlParserOptions = {
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
   allowBooleanAttributes: true,
-  format: true
+  format: true,
 }
 
 export function getCsProjFromXml(filePath: string) {

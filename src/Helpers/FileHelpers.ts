@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 import path from 'path'
-import { getCsProjFromXml } from './XMLHelpers.js'
+import { getCsProjFromXml } from './XMLHelpers'
 
 export function tryFindCsProjFile(projectName: string, directory: string) {
   // Try to find the csproj file in the root of the project
@@ -24,7 +24,7 @@ function normalizePath(projectPath: string) {
     return projectPath.trim()
   }
 
-  const repoDir = path.resolve(import.meta.dirname, '../../').trim()
+  const repoDir = path.resolve(__dirname, '../../').trim()
   return path.resolve(repoDir, projectPath)
 }
 
@@ -88,7 +88,7 @@ export function tryFindProjectListFromSlnFile(
 ) {
   let content = ''
   const slnPath = path.join(projectPath, filePath)
-  
+
   if (!fs.existsSync(slnPath)) {
     return null
   }
@@ -123,7 +123,11 @@ export function tryFindProjectListFromSlnFile(
       }
 
       const projectPath = match[2].replace(/\\/g, '/')
-      const fullPath = path.join(slnPath.replace('.sln', ''), '../', projectPath)
+      const fullPath = path.join(
+        slnPath.replace('.sln', ''),
+        '../',
+        projectPath,
+      )
       return {
         name: match[1],
         projectPath,
@@ -146,10 +150,17 @@ export function tryFindTargetFramework(csprojPath: string) {
   return csProj.Project.PropertyGroup.TargetFramework
 }
 
-export function searchForCsProjRecursive(projectName: string, maxLevel: number) {
+export function searchForCsProjRecursive(
+  projectName: string,
+  maxLevel: number,
+) {
   const projectPaths = getNormalizedPaths()
   for (const projectPath of projectPaths) {
-    const csProjFile = searchForCsProjRecursiveLoop(projectName, projectPath, maxLevel)
+    const csProjFile = searchForCsProjRecursiveLoop(
+      projectName,
+      projectPath,
+      maxLevel,
+    )
     if (csProjFile) {
       return csProjFile
     }

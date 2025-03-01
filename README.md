@@ -1,6 +1,6 @@
 # Package Reference Manager
 
-This is a node CLI to help facilitate changing references between
+This is a node src to help facilitate changing references between
 a local bin folder and a nuget feed.
 
 ## Installation
