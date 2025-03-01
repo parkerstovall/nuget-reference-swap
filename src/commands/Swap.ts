@@ -18,6 +18,19 @@ type SwapOptions = {
   recursionLevel: number
 }
 
+type Project = {
+  name: string
+  projectPath: string
+  fullPath: string
+}
+
+type PackageSwapDetails = {
+  local: boolean
+  removePackageName: string
+  addPackageName: string
+  addPackageVersion: string
+}
+
 export function Swap() {
   const swap = new commander.Command('swap')
   swap
@@ -47,7 +60,10 @@ export function Swap() {
   return swap
 }
 
-function getListOfProjects(slnPath: string, command: commander.Command) {
+function getListOfProjects(
+  slnPath: string,
+  command: commander.Command,
+): Project[] {
   const projectPaths = getNormalizedPaths()
   let projects: { name: string; projectPath: string; fullPath: string }[] = []
   for (const projectPath of projectPaths) {
@@ -78,6 +94,110 @@ function verifyOptions(options: SwapOptions, command: commander.Command) {
   }
 }
 
+function swapPackageLocal(project: Project, details: PackageSwapDetails) {
+  let found = false
+  if (!fs.existsSync(project.fullPath)) {
+    throw new Error(`File not found at ${project.fullPath}`)
+  }
+
+  const parsedContent = getCsProjFromXml(project.fullPath)
+  let itemGroups = parsedContent.Project.ItemGroup
+  if (!Array.isArray(itemGroups)) {
+    itemGroups = [itemGroups]
+  }
+
+  for (const itemGroup of itemGroups) {
+    if (itemGroup.PackageReference) {
+      if (!Array.isArray(itemGroup.PackageReference)) {
+        itemGroup.PackageReference = [itemGroup.PackageReference]
+      }
+
+      for (const pkg of itemGroup.PackageReference) {
+        if (pkg['@_Include'] === details.removePackageName) {
+          found = true
+          break
+        }
+      }
+    }
+
+    if (found) {
+      break
+    }
+  }
+
+  if (!found) {
+    return
+  }
+
+  execWrapper(
+    `dotnet remove ${project.fullPath} package ${details.removePackageName}`,
+  )
+
+  if (details.addPackageVersion !== 'latest') {
+    execWrapper(
+      `dotnet add ${project.fullPath} package ${details.addPackageName} --version ${details.addPackageVersion}`,
+    )
+  }
+
+  execWrapper(
+    `dotnet add ${project.fullPath} package ${details.addPackageName}`,
+  )
+}
+
+function addNugetSource() {
+  let envSource = process.env.NUGET_FEED
+  if (!envSource) {
+    throw new Error('NUGET_FEED environment variable not set')
+  }
+
+  if (!envSource.endsWith('index.json')) {
+    if (!envSource.endsWith('/')) {
+      envSource = `${envSource}/`
+    }
+
+    envSource = `${envSource}index.json`
+  }
+
+  const sources = execWrapper(`dotnet nuget list source`).toString()
+  for (const source of sources.split('\n')) {
+    if (source.trim() === envSource) {
+      return
+    }
+  }
+
+  execWrapper(
+    `dotnet nuget add source ${envSource} -u PRM -n PRM_SOURCE -p ${process.env.GIT_TOKEN} --store-password-in-clear-text`,
+  )
+}
+
+function getPackageSwapDetails(
+  isLocal: boolean,
+  packageName: string,
+  csprojFile: string,
+) {
+  let removePackageName: string
+  let addPackageName: string
+  let addPackageVersion: string
+
+  if (isLocal) {
+    makeNugetPackage(packageName, csprojFile)
+    addPackageVersion = '1.0.0'
+    removePackageName = packageName
+    addPackageName = `${packageName}_LocalPRM_CLI`
+  } else {
+    addPackageName = packageName
+    addNugetSource()
+    addPackageVersion = 'latest'
+    removePackageName = `${packageName}_LocalPRM_CLI`
+  }
+
+  return {
+    removePackageName,
+    addPackageName,
+    addPackageVersion,
+  }
+}
+
 function SwapCommand(options: SwapOptions, command: commander.Command) {
   options.source = options.source.toLocaleLowerCase()
   options.file = options.file.trim()
@@ -93,48 +213,17 @@ function SwapCommand(options: SwapOptions, command: commander.Command) {
     )
   }
 
-  const [pkgSource, pkgName] = makeNugetPackage(options.name, csprojFile)
+  const packageSwapDetails = {
+    local: options.source === 'l' || options.source === 'local',
+    ...getPackageSwapDetails(
+      options.source === 'l' || options.source === 'local',
+      options.name,
+      csprojFile,
+    ),
+  }
 
   for (const project of projectList) {
-    let found = false
-    if (!fs.existsSync(project.fullPath)) {
-      command.error(colors.red(`File not found at ${project.fullPath}`))
-    }
-
-    const parsedContent = getCsProjFromXml(project.fullPath)
-    let itemGroups = parsedContent.Project.ItemGroup
-    if (!Array.isArray(itemGroups)) {
-      itemGroups = [itemGroups]
-    }
-
-    for (const itemGroup of itemGroups) {
-      if (itemGroup.PackageReference) {
-        if (!Array.isArray(itemGroup.PackageReference)) {
-          itemGroup.PackageReference = [itemGroup.PackageReference]
-        }
-
-        for (const pkg of itemGroup.PackageReference) {
-          if (pkg['@_Include'] === options.name) {
-            found = true
-            break
-          }
-        }
-      }
-      if (found) {
-        break
-      }
-    }
-
-    if (!found) {
-      continue
-    }
-
-    execWrapper(`dotnet remove ${project.fullPath} package ${options.name}`)
-
-    execWrapper(
-      `dotnet add ${project.fullPath} package ${pkgName} --source ${pkgSource} --version 1.0.0`,
-    )
-
+    swapPackageLocal(project, packageSwapDetails)
     execWrapper(`dotnet restore ${project.fullPath}`)
   }
 
@@ -145,29 +234,12 @@ function makeNugetPackage(name: string, csProj: string) {
   const projectPath = path.join(csProj, '../')
   const sources = execWrapper(`dotnet nuget list source`).toString()
   const outPath = path.join(__dirname, '../', '../', 'out')
-  if (!sources.includes('LocalPRM_CLI')) {
+  if (!sources.includes(outPath)) {
     execWrapper(`dotnet nuget add source ${outPath}`)
   }
 
-  try {
-    execWrapper(`dotnet build ${projectPath}`)
-  } catch {
-    console.log(colors.red('Build failed.'))
-    process.exit(1)
-  }
-
-  const pkgPath = path.join(outPath, `${name}_LocalPRM_CLI.1.0.0.nupkg`)
-  if (fs.existsSync(pkgPath)) {
-    fs.rmSync(pkgPath)
-  }
-
-  const symbPath = path.join(
-    outPath,
-    `${name}_LocalPRM_CLI.1.0.0.symbols.nupkg`,
-  )
-  if (fs.existsSync(symbPath)) {
-    fs.rmSync(symbPath)
-  }
+  execWrapper(`dotnet restore ${projectPath}`)
+  execWrapper(`dotnet build ${projectPath}`)
 
   try {
     execWrapper(
@@ -177,6 +249,4 @@ function makeNugetPackage(name: string, csProj: string) {
     console.log(colors.red('Pack failed.'))
     process.exit(1)
   }
-
-  return [outPath, `${name}_LocalPRM_CLI`]
 }
