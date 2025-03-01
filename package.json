@@ -6,12 +6,10 @@
     "prm": "dist/prm.js"
   },
   "scripts": {
-    "lint": "eslint ./src",
+    "lint": "eslint ./src --fix",
     "build": "rm -rf dist && tsc",
     "dev": "ts-node ./src/prm.ts",
-    "start": "node dist/prm.js",
-    "testing": "npm run dev -- swap -s l -n DbLocator -f /DbLocatorExample/DbLocatorExample.sln",
-    "reinstall": "npm run build && npm uninstall -g @parker-stovall/prm && npm install -g ."
+    "start": "node dist/prm.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
