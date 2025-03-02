@@ -20,7 +20,7 @@ You should then have 'nrs' available as an npx command
 
 #### Description
 
-Lists all projects found on the NUGET_FEED, as well as if a suitable bin folder was found on the LOCAL_PACKAGE_PATH.
+Lists all projects found on the nuget_feed, as well as if a suitable bin folder was found on the search_path.
 
 #### Arguments
 
@@ -41,3 +41,17 @@ Swaps references throughout all projects specified in a .SLN file to either a lo
 -n, --name: (Required) Name of the package to swap.
 
 -v, --version: Version of the package to use from the feed. Defaults to latest
+
+
+### Config
+
+#### Description
+
+Sets configuration for the tool. Any value can technically be set, but the tool only looks for the following values:
+
+- nuget_feed
+  - The url of the nuget feed to search through
+- token
+  - The token (if required) to access the nuget feed
+- search_path
+  - Local path to search for projects

@@ -1,6 +1,7 @@
 import * as fs from 'fs'
 import path from 'path'
 import { getCsProjFromXml } from './XMLHelpers'
+import { getConfigValue } from './ConfigHelper'
 
 export function tryFindCsProjFile(projectName: string, directory: string) {
   // Try to find the csproj file in the root of the project
@@ -19,17 +20,30 @@ export function tryFindCsProjFile(projectName: string, directory: string) {
   return null
 }
 
-function normalizePath(projectPath: string) {
-  if (path.isAbsolute(projectPath)) {
-    return projectPath.trim()
+export function getOutPath(newPath: string) {
+  let normalPath = path.join(__dirname, '../', newPath)
+  if (process.platform === 'win32') {
+    normalPath = normalPath.replace(/\\/g, '/')
   }
 
-  const repoDir = path.resolve(__dirname, '../../').trim()
-  return path.resolve(repoDir, projectPath)
+  return normalPath
+}
+
+function normalizePath(newPath: string) {
+  if (path.isAbsolute(newPath)) {
+    return newPath.trim()
+  }
+
+  let normalPath = path.join(process.cwd(), newPath)
+  if (process.platform === 'win32') {
+    normalPath = normalPath.replace(/\\/g, '/')
+  }
+
+  return normalPath
 }
 
 export function getNormalizedPaths() {
-  const paths = process.env.LOCAL_PACKAGE_PATH?.split(',') || []
+  const paths = getConfigValue('search_path')?.split(',') || []
   const newPaths = paths.map(normalizePath)
 
   // Account for absolute pathing
