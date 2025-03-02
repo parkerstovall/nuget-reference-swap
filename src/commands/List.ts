@@ -1,6 +1,7 @@
 import * as commander from 'commander'
 import colors from 'colors'
 import { searchForCsProjRecursive } from '../Helpers/FileHelpers'
+import { getConfigValue } from '../Helpers/ConfigHelper'
 
 type ListOptions = {
   query?: string
@@ -24,8 +25,8 @@ export function List() {
 }
 
 async function ListPackages(options: ListOptions, command: commander.Command) {
-  const token = process.env.GIT_TOKEN
-  const feed = process.env.NUGET_FEED
+  const token = getConfigValue('token')
+  const feed = getConfigValue('nuget_feed')
   let url = `${feed}/query/`
 
   const query = options.query

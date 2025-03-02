@@ -13,6 +13,7 @@ dist-ssr
 .env
 .npmrc
 *.local
+config.json
 
 # Editor directories and files
 .idea

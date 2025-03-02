@@ -3,12 +3,14 @@ import * as fs from 'fs'
 import colors from 'colors'
 import {
   getNormalizedPaths,
+  getOutPath,
   searchForCsProjRecursive,
   tryFindProjectListFromSlnFile,
 } from '../Helpers/FileHelpers'
 import path from 'path'
 import { getCsProjFromXml } from '../Helpers/XMLHelpers'
 import { execWrapper } from '../Helpers/ExecWrapper'
+import { getConfigValue } from '../Helpers/ConfigHelper'
 
 type SwapOptions = {
   source: string
@@ -145,11 +147,7 @@ function swapPackageLocal(project: Project, details: PackageSwapDetails) {
 }
 
 function addNugetSource() {
-  let envSource = process.env.NUGET_FEED
-  if (!envSource) {
-    throw new Error('NUGET_FEED environment variable not set')
-  }
-
+  let envSource = getConfigValue('nuget_feed')
   if (!envSource.endsWith('index.json')) {
     if (!envSource.endsWith('/')) {
       envSource = `${envSource}/`
@@ -166,7 +164,7 @@ function addNugetSource() {
   }
 
   execWrapper(
-    `dotnet nuget add source ${envSource} -u nrs -n nrs_SOURCE -p ${process.env.GIT_TOKEN} --store-password-in-clear-text`,
+    `dotnet nuget add source ${envSource} -u nrs -n nrs_SOURCE -p ${getConfigValue('token')} --store-password-in-clear-text`,
   )
 }
 
@@ -233,7 +231,7 @@ function SwapCommand(options: SwapOptions, command: commander.Command) {
 function makeNugetPackage(name: string, csProj: string) {
   const projectPath = path.join(csProj, '../')
   const sources = execWrapper(`dotnet nuget list source`).toString()
-  const outPath = path.join(__dirname, '../', '../', 'out')
+  const outPath = getOutPath('out')
   if (!sources.includes(outPath)) {
     execWrapper(`dotnet nuget add source ${outPath}`)
   }
