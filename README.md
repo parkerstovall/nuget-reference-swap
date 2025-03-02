@@ -12,7 +12,7 @@ npm i
 npm run build
 npm i -g .
 
-You should then have 'prm' available as an npx command
+You should then have 'nrs' available as an npx command
 
 ## Commands
 
@@ -25,7 +25,6 @@ Lists all projects found on the NUGET_FEED, as well as if a suitable bin folder 
 #### Arguments
 
 -q, --query: Keyword to search through nuget feed
--p, --prefix: Prefix to add to the directory name when searching through the bin path. (Ex, if your organization uses a naming prefix for your repositories that your C# Projects do not have as part of their name)
 
 ### Swap
 
@@ -42,5 +41,3 @@ Swaps references throughout all projects specified in a .SLN file to either a lo
 -n, --name: (Required) Name of the package to swap.
 
 -v, --version: Version of the package to use from the feed. Defaults to latest
-
--p, --prefix: Prefix to add to the directory name when searching through the bin path. (See List command arguments)

@@ -166,7 +166,7 @@ function addNugetSource() {
   }
 
   execWrapper(
-    `dotnet nuget add source ${envSource} -u PRM -n PRM_SOURCE -p ${process.env.GIT_TOKEN} --store-password-in-clear-text`,
+    `dotnet nuget add source ${envSource} -u nrs -n nrs_SOURCE -p ${process.env.GIT_TOKEN} --store-password-in-clear-text`,
   )
 }
 
@@ -183,12 +183,12 @@ function getPackageSwapDetails(
     makeNugetPackage(packageName, csprojFile)
     addPackageVersion = '1.0.0'
     removePackageName = packageName
-    addPackageName = `${packageName}_LocalPRM_CLI`
+    addPackageName = `${packageName}_Localnrs_CLI`
   } else {
     addPackageName = packageName
     addNugetSource()
     addPackageVersion = 'latest'
-    removePackageName = `${packageName}_LocalPRM_CLI`
+    removePackageName = `${packageName}_Localnrs_CLI`
   }
 
   return {
@@ -243,7 +243,7 @@ function makeNugetPackage(name: string, csProj: string) {
 
   try {
     execWrapper(
-      `dotnet pack ${projectPath} --configuration Debug --include-symbols --include-source -o ${outPath} -p:PackageVersion=1.0.0 -p:PackageID=${name}_LocalPRM_CLI`,
+      `dotnet pack ${projectPath} --configuration Debug --include-symbols --include-source -o ${outPath} -p:PackageVersion=1.0.0 -p:PackageID=${name}_Localnrs_CLI`,
     )
   } catch {
     console.log(colors.red('Pack failed.'))
