@@ -1,6 +1,6 @@
 {
   "name": "nuget-reference-swap",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": "parkerstovall",
   "description": "Swaps between local and remote nuget references in a .NET project",
   "type": "commonjs",
