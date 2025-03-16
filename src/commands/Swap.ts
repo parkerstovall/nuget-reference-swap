@@ -2,22 +2,20 @@ import * as commander from 'commander'
 import * as fs from 'fs'
 import colors from 'colors'
 import {
-  getNormalizedPaths,
   getOutPath,
-  searchForCsProjRecursive,
+  searchPathsForFile,
   tryFindProjectListFromSlnFile,
-} from '../Helpers/FileHelpers'
+} from '../app-code/file-helper'
 import path from 'path'
-import { getCsProjFromXml } from '../Helpers/XMLHelpers'
-import { execWrapper } from '../Helpers/ExecWrapper'
-import { getConfigValue } from '../Helpers/ConfigHelper'
+import { getCsProjFromXml } from '../app-code/xml-helper'
+import { execWrapper } from '../app-code/exec-wrapper'
+import { getConfigValue } from '../app-code/config-helper'
 
 type SwapOptions = {
-  source: string
-  file: string
+  solution: string
   name: string
-  version: string
-  recursionLevel: number
+  local?: boolean
+  auth?: boolean
 }
 
 type Project = {
@@ -27,10 +25,9 @@ type Project = {
 }
 
 type PackageSwapDetails = {
-  local: boolean
   removePackageName: string
   addPackageName: string
-  addPackageVersion: string
+  local?: boolean
 }
 
 export function Swap() {
@@ -38,62 +35,21 @@ export function Swap() {
   swap
     .description('Swap package references between local and nuget sources')
     .requiredOption(
-      '-s, --source <source>',
-      '(Required) Source to swap to <l, local> or <n, nuget>',
+      '-s, --solution <solution>',
+      '(Required) Solution name to swap packages in',
     )
-    .requiredOption('-f, --file <file>', '(Required) Path to the solution file')
     .requiredOption(
       '-n --name <name>',
       '(Required) Name of the project to swap. Use list command to find available options',
     )
     .option(
-      '-v --version <version>',
-      'Version of the package to swap.',
-      '@Latest',
+      '-l, --local',
+      '(Required) Whether to swap to the local or nuget package',
     )
-    .option(
-      '-r --recursion-level <recursionLevel>',
-      'How many levels of recursion should the command search on the project path to find the local package. -1 for no limit',
-      parseFloat,
-      1,
-    )
+    .option('-a --auth', 'Whether to use nuget_feed and token stored in config')
     .action(SwapCommand)
 
   return swap
-}
-
-function getListOfProjects(
-  slnPath: string,
-  command: commander.Command,
-): Project[] {
-  const projectPaths = getNormalizedPaths()
-  let projects: { name: string; projectPath: string; fullPath: string }[] = []
-  for (const projectPath of projectPaths) {
-    const tempProjects = tryFindProjectListFromSlnFile(projectPath, slnPath)
-    if (!tempProjects || tempProjects.length === 0) {
-      continue
-    }
-
-    projects = tempProjects
-    break
-  }
-
-  if (projects.length === 0) {
-    command.error(colors.red('No projects found in the solution file'))
-  }
-
-  return projects
-}
-
-function verifyOptions(options: SwapOptions, command: commander.Command) {
-  const acceptedSources = ['l', 'n', 'local', 'nuget']
-  if (!acceptedSources.includes(options.source)) {
-    command.error(
-      colors.red(
-        "Invalid value for source. Supported Values: {'l', 'local', 'n', 'nuget'}",
-      ),
-    )
-  }
 }
 
 function swapPackageLocal(project: Project, details: PackageSwapDetails) {
@@ -135,12 +91,6 @@ function swapPackageLocal(project: Project, details: PackageSwapDetails) {
     `dotnet remove ${project.fullPath} package ${details.removePackageName}`,
   )
 
-  if (details.addPackageVersion !== 'latest') {
-    execWrapper(
-      `dotnet add ${project.fullPath} package ${details.addPackageName} --version ${details.addPackageVersion}`,
-    )
-  }
-
   execWrapper(
     `dotnet add ${project.fullPath} package ${details.addPackageName}`,
   )
@@ -164,63 +114,71 @@ function addNugetSource() {
   }
 
   execWrapper(
-    `dotnet nuget add source ${envSource} -u nrs -n nrs_SOURCE -p ${getConfigValue('token')} --store-password-in-clear-text`,
+    `dotnet nuget add source ${envSource} -u nrs -p ${getConfigValue('token')} --store-password-in-clear-text`,
   )
 }
 
 function getPackageSwapDetails(
-  isLocal: boolean,
   packageName: string,
   csprojFile: string,
+  isLocal?: boolean,
+  auth?: boolean,
 ) {
   let removePackageName: string
   let addPackageName: string
-  let addPackageVersion: string
 
   if (isLocal) {
     makeNugetPackage(packageName, csprojFile)
-    addPackageVersion = '1.0.0'
     removePackageName = packageName
     addPackageName = `${packageName}_Localnrs_CLI`
   } else {
     addPackageName = packageName
-    addNugetSource()
-    addPackageVersion = 'latest'
     removePackageName = `${packageName}_Localnrs_CLI`
+
+    if (auth) {
+      addNugetSource()
+    }
   }
 
   return {
     removePackageName,
     addPackageName,
-    addPackageVersion,
   }
 }
 
-function SwapCommand(options: SwapOptions, command: commander.Command) {
-  options.source = options.source.toLocaleLowerCase()
-  options.file = options.file.trim()
-  verifyOptions(options, command)
-
-  const projectList = getListOfProjects(options.file, command)
-  const csprojFile = searchForCsProjRecursive(options.name, 2)
-  if (!csprojFile) {
+async function SwapCommand(options: SwapOptions, command: commander.Command) {
+  const csprojFiles = await searchPathsForFile(`${options.name}.csproj`)
+  if (csprojFiles.length < 1) {
     command.error(
       colors.red(
         'No csproj file found with that project name. Use the list command to debug',
       ),
     )
+  } else if (csprojFiles.length > 1) {
+    command.error(
+      colors.red(
+        'Multiple csproj files found with that project name. Use the list command to debug',
+      ),
+    )
   }
 
   const packageSwapDetails = {
-    local: options.source === 'l' || options.source === 'local',
+    local: options.local,
     ...getPackageSwapDetails(
-      options.source === 'l' || options.source === 'local',
       options.name,
-      csprojFile,
+      csprojFiles[0],
+      options.local,
+      options.auth,
     ),
   }
 
+  const projectList = await tryFindProjectListFromSlnFile(options.solution)
+  if (!projectList || projectList.length === 0) {
+    command.error(colors.red(`Solution file not found: ${options.solution}`))
+  }
+
   for (const project of projectList) {
+    console.log(`Swapping package at ${project.fullPath}...`)
     swapPackageLocal(project, packageSwapDetails)
     execWrapper(`dotnet restore ${project.fullPath}`)
   }

@@ -1,7 +1,7 @@
 import * as commander from 'commander'
 import * as fs from 'fs'
-import { getOutPath } from '../Helpers/FileHelpers'
-import { getConfig } from '../Helpers/ConfigHelper'
+import { getOutPath } from '../app-code/file-helper'
+import { getConfig } from '../app-code/config-helper'
 
 type ConfigOptions = {
   key: string

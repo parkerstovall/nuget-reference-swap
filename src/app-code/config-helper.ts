@@ -1,4 +1,4 @@
-import { getOutPath } from './FileHelpers'
+import { getOutPath } from './file-helper'
 import * as fs from 'fs'
 
 export function getConfig(): Record<string, string> {
