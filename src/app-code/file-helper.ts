@@ -1,11 +1,24 @@
 import * as fs from 'fs'
+import * as os from 'os'
 import { glob } from 'glob'
 import path from 'path'
 import { getCsProjFromXml } from './xml-helper'
 import { getConfigValue } from './config-helper'
 
-export function getOutPath(newPath: string) {
-  let normalPath = path.join(__dirname, '../', newPath)
+export function getOutPath(fileName?: string) {
+  let normalPath = path.join(__dirname, '../', 'data')
+
+  if (!fs.existsSync(normalPath)) {
+    fs.mkdirSync(normalPath, { recursive: true })
+  }
+
+  if (fileName) {
+    normalPath = path.join(normalPath, fileName)
+    if (!fs.existsSync(normalPath)) {
+      fs.writeFileSync(normalPath, '', { flag: 'wx' })
+    }
+  }
+
   if (process.platform === 'win32') {
     normalPath = normalPath.replace(/\\/g, '/')
   }
@@ -15,6 +28,11 @@ export function getOutPath(newPath: string) {
 
 function normalizePath(newPath: string) {
   if (path.isAbsolute(newPath)) {
+    return newPath.trim()
+  }
+
+  if (newPath.startsWith('~')) {
+    newPath = path.join(os.homedir(), newPath.slice(1))
     return newPath.trim()
   }
 
@@ -75,8 +93,7 @@ export function tryFindTargetFramework(csprojPath: string) {
   return csProj.Project.PropertyGroup.TargetFramework
 }
 
-export async function searchPathsForFile(...searchPaths: string[]) {
-  const searchPath = path.join(...searchPaths)
+export async function searchPathsForFile(searchPath: string) {
   const projectPaths = getNormalizedPaths()
   const globs: string[] = []
   const promises: Promise<string[]>[] = []

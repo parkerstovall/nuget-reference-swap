@@ -189,9 +189,9 @@ async function SwapCommand(options: SwapOptions, command: commander.Command) {
 function makeNugetPackage(name: string, csProj: string) {
   const projectPath = path.join(csProj, '../')
   const sources = execWrapper(`dotnet nuget list source`).toString()
-  const outPath = getOutPath('out')
+  const outPath = getOutPath()
   if (!sources.includes(outPath)) {
-    execWrapper(`dotnet nuget add source ${outPath}`)
+    execWrapper(`dotnet nuget add source ${outPath} -n Localnrs_CLI`)
   }
 
   execWrapper(`dotnet restore ${projectPath}`)

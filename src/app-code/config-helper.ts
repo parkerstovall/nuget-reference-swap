@@ -7,7 +7,11 @@ export function getConfig(): Record<string, string> {
     return {}
   }
 
-  return JSON.parse(fs.readFileSync(configPath, 'utf8'))
+  try {
+    return JSON.parse(fs.readFileSync(configPath, 'utf8'))
+  } catch {
+    return {}
+  }
 }
 
 export function getConfigValue(key: string) {

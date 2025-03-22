@@ -42,18 +42,18 @@ async function ListPackages(options: ListOptions, command: commander.Command) {
     url += `?q=${query}`
   }
 
-  const data = await fetch(url, {
+  const nugetResp = await fetch(url, {
     headers,
   }).then((response) => response.json())
 
-  if (!data.data || data.data.length === 0) {
+  if (!nugetResp.data || nugetResp.data.length === 0) {
     console.log('No packages found.')
     return
   }
 
   console.log(colors.green('Available packages:'))
-  for (const row of data.data) {
-    console.log(row.title)
+  for (const row of nugetResp.data) {
+    console.log(`  - ${row.title}`)
     const csprojFiles = await searchPathsForFile(`${row.title}.csproj`)
 
     if (csprojFiles.length === 1) {
