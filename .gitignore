@@ -23,4 +23,4 @@ config.json
 *.njsproj
 *.sln
 *.sw?
-out
+data

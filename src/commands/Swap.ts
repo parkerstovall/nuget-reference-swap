@@ -191,7 +191,7 @@ function makeNugetPackage(name: string, csProj: string) {
   const sources = execWrapper(`dotnet nuget list source`).toString()
   const outPath = getOutPath()
   if (!sources.includes(outPath)) {
-    execWrapper(`dotnet nuget add source ${outPath}`)
+    execWrapper(`dotnet nuget add source ${outPath} -n Localnrs_CLI`)
   }
 
   execWrapper(`dotnet restore ${projectPath}`)
