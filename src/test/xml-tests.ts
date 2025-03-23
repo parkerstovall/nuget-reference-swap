@@ -44,7 +44,7 @@ const netFrameworkCsProjXml = `<Project xmlns="http://schemas.microsoft.com/deve
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Import Project="$(MSBuildToolsPath)\\Microsoft.CSharp.targets" />
 </Project>
 `
 
