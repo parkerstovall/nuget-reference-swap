@@ -1,33 +1,18 @@
 import * as commander from 'commander'
-import * as fs from 'fs'
 import colors from 'colors'
 import {
-  getOutPath,
+  isNetFramework,
   searchPathsForFile,
   tryFindProjectListFromSlnFile,
 } from '../app-code/file-helper'
-import path from 'path'
-import { getCsProjFromXml } from '../app-code/xml-helper'
 import { execWrapper } from '../app-code/exec-wrapper'
-import { getConfigValue } from '../app-code/config-helper'
+import { NugetManager } from '../app-code/nuget-manager'
 
 type SwapOptions = {
   solution: string
   name: string
   local?: boolean
   auth?: boolean
-}
-
-type Project = {
-  name: string
-  projectPath: string
-  fullPath: string
-}
-
-type PackageSwapDetails = {
-  removePackageName: string
-  addPackageName: string
-  local?: boolean
 }
 
 export function Swap() {
@@ -52,100 +37,6 @@ export function Swap() {
   return swap
 }
 
-function swapPackageLocal(project: Project, details: PackageSwapDetails) {
-  let found = false
-  if (!fs.existsSync(project.fullPath)) {
-    throw new Error(`File not found at ${project.fullPath}`)
-  }
-
-  const parsedContent = getCsProjFromXml(project.fullPath)
-  let itemGroups = parsedContent.Project.ItemGroup
-  if (!Array.isArray(itemGroups)) {
-    itemGroups = [itemGroups]
-  }
-
-  for (const itemGroup of itemGroups) {
-    if (itemGroup.PackageReference) {
-      if (!Array.isArray(itemGroup.PackageReference)) {
-        itemGroup.PackageReference = [itemGroup.PackageReference]
-      }
-
-      for (const pkg of itemGroup.PackageReference) {
-        if (pkg['@_Include'] === details.removePackageName) {
-          found = true
-          break
-        }
-      }
-    }
-
-    if (found) {
-      break
-    }
-  }
-
-  if (!found) {
-    return
-  }
-
-  execWrapper(
-    `dotnet remove ${project.fullPath} package ${details.removePackageName}`,
-  )
-
-  execWrapper(
-    `dotnet add ${project.fullPath} package ${details.addPackageName}`,
-  )
-}
-
-function addNugetSource() {
-  let envSource = getConfigValue('nuget_feed')
-  if (!envSource.endsWith('index.json')) {
-    if (!envSource.endsWith('/')) {
-      envSource = `${envSource}/`
-    }
-
-    envSource = `${envSource}index.json`
-  }
-
-  const sources = execWrapper(`dotnet nuget list source`).toString()
-  for (const source of sources.split('\n')) {
-    if (source.trim() === envSource) {
-      return
-    }
-  }
-
-  execWrapper(
-    `dotnet nuget add source ${envSource} -u nrs -p ${getConfigValue('token')} --store-password-in-clear-text`,
-  )
-}
-
-function getPackageSwapDetails(
-  packageName: string,
-  csprojFile: string,
-  isLocal?: boolean,
-  auth?: boolean,
-) {
-  let removePackageName: string
-  let addPackageName: string
-
-  if (isLocal) {
-    makeNugetPackage(packageName, csprojFile)
-    removePackageName = packageName
-    addPackageName = `${packageName}_Localnrs_CLI`
-  } else {
-    addPackageName = packageName
-    removePackageName = `${packageName}_Localnrs_CLI`
-
-    if (auth) {
-      addNugetSource()
-    }
-  }
-
-  return {
-    removePackageName,
-    addPackageName,
-  }
-}
-
 async function SwapCommand(options: SwapOptions, command: commander.Command) {
   const csprojFiles = await searchPathsForFile(`${options.name}.csproj`)
   if (csprojFiles.length < 1) {
@@ -162,9 +53,11 @@ async function SwapCommand(options: SwapOptions, command: commander.Command) {
     )
   }
 
+  const nugetManager = new NugetManager(isNetFramework(csprojFiles[0]))
+
   const packageSwapDetails = {
     local: options.local,
-    ...getPackageSwapDetails(
+    ...nugetManager.getPackageSwapDetails(
       options.name,
       csprojFiles[0],
       options.local,
@@ -179,30 +72,9 @@ async function SwapCommand(options: SwapOptions, command: commander.Command) {
 
   for (const project of projectList) {
     console.log(`Swapping package at ${project.fullPath}...`)
-    swapPackageLocal(project, packageSwapDetails)
+    nugetManager.swapPackage(project, packageSwapDetails)
     execWrapper(`dotnet restore ${project.fullPath}`)
   }
 
   execWrapper('dotnet nuget locals all --clear')
-}
-
-function makeNugetPackage(name: string, csProj: string) {
-  const projectPath = path.join(csProj, '../')
-  const sources = execWrapper(`dotnet nuget list source`).toString()
-  const outPath = getOutPath()
-  if (!sources.includes(outPath)) {
-    execWrapper(`dotnet nuget add source ${outPath} -n Localnrs_CLI`)
-  }
-
-  execWrapper(`dotnet restore ${projectPath}`)
-  execWrapper(`dotnet build ${projectPath}`)
-
-  try {
-    execWrapper(
-      `dotnet pack ${projectPath} --configuration Debug --include-symbols --include-source -o ${outPath} -p:PackageVersion=1.0.0 -p:PackageID=${name}_Localnrs_CLI`,
-    )
-  } catch {
-    console.log(colors.red('Pack failed.'))
-    process.exit(1)
-  }
 }

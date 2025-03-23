@@ -2,7 +2,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import { glob } from 'glob'
 import path from 'path'
-import { getCsProjFromXml } from './xml-helper'
+import { csProjectXml, getObjectFromXml } from './xml-helper'
 import { getConfigValue } from './config-helper'
 
 export function getOutPath(fileName?: string) {
@@ -88,9 +88,30 @@ export async function tryFindProjectListFromSlnFile(solution: string) {
   return projectPaths
 }
 
-export function tryFindTargetFramework(csprojPath: string) {
-  const csProj = getCsProjFromXml(csprojPath)
-  return csProj.Project.PropertyGroup.TargetFramework
+export function isNetFramework(csprojPath: string) {
+  const csProj = getObjectFromXml<csProjectXml>(csprojPath)
+  let propertyGroups = csProj.Project.PropertyGroup
+  if (!Array.isArray(propertyGroups)) {
+    propertyGroups = [propertyGroups]
+  }
+
+  let version: string | undefined
+  for (const propertyGroup of propertyGroups) {
+    if (propertyGroup.TargetFramework) {
+      version = propertyGroup.TargetFramework
+    }
+
+    if (propertyGroup.TargetFrameworkVersion) {
+      version = propertyGroup.TargetFrameworkVersion
+    }
+  }
+
+  if (!version) {
+    throw new Error(`No TargetFramework found in ${csprojPath}`)
+  }
+
+  const versionNum = parseFloat(version.replace(/[^0-9]/g, ''))
+  return versionNum < 5.0
 }
 
 export async function searchPathsForFile(searchPath: string) {

@@ -17,14 +17,26 @@ export type ItemGroup = {
 }
 
 type PropertyGroup = {
-  TargetFramework: string
+  TargetFramework?: string
+  TargetFrameworkVersion?: string
 }
 
 // There is a lot more to the csproject file, I just don't need it.
 export type csProjectXml = {
   Project: {
-    PropertyGroup: PropertyGroup
+    PropertyGroup: PropertyGroup | PropertyGroup[]
     ItemGroup: ItemGroup | ItemGroup[]
+  }
+}
+
+type Package = {
+  '@_id': string
+  '@_version': string
+}
+
+export type packageConfig = {
+  packages: {
+    package: Package | Package[]
   }
 }
 
@@ -35,8 +47,11 @@ const xmlParserOptions = {
   format: true,
 }
 
-export function getCsProjFromXml(filePath: string) {
-  const content = fs.readFileSync(filePath, 'utf8')
+export function getObjectFromXml<T>(xml: string, isFilePath = true): T {
+  if (isFilePath) {
+    xml = fs.readFileSync(xml, 'utf8')
+  }
+
   const xmlParser = new XMLParser(xmlParserOptions)
-  return xmlParser.parse(content) as csProjectXml
+  return xmlParser.parse(xml) as T
 }
