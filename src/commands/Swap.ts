@@ -6,7 +6,7 @@ import {
   tryFindProjectListFromSlnFile,
 } from '../app-code/file-helper'
 import { execWrapper } from '../app-code/exec-wrapper'
-import { NugetManager } from '../app-code/nuget-manager'
+import { SdkSwapper } from '../app-code/swappers/sdk-swapper'
 
 type SwapOptions = {
   solution: string
@@ -53,13 +53,24 @@ async function SwapCommand(options: SwapOptions, command: commander.Command) {
     )
   }
 
-  const nugetManager = new NugetManager(isNetFramework(csprojFiles[0]))
+  if (!isNetFramework(csprojFiles[0])) {
+    await swapCore(options, command, csprojFiles[0])
+  } else {
+    //await swapFramework(options, command, csprojFiles[0])
+  }
+}
 
+async function swapCore(
+  options: SwapOptions,
+  command: commander.Command,
+  csprojFile: string,
+) {
+  const nugetManager = new SdkSwapper()
   const packageSwapDetails = {
     local: options.local,
     ...nugetManager.getPackageSwapDetails(
       options.name,
-      csprojFiles[0],
+      csprojFile,
       options.local,
       options.auth,
     ),
@@ -78,3 +89,9 @@ async function SwapCommand(options: SwapOptions, command: commander.Command) {
 
   execWrapper('dotnet nuget locals all --clear')
 }
+
+// async function swapFramework(
+//   options: SwapOptions,
+//   command: commander.Command,
+//   csprojFile: string,
+// ) {}

@@ -4,6 +4,7 @@ import { glob } from 'glob'
 import path from 'path'
 import { csProjectXml, getObjectFromXml } from './xml-helper'
 import { getConfigValue } from './config-helper'
+import { Project } from './types'
 
 export function getOutPath(fileName?: string) {
   let normalPath = path.join(__dirname, '../', 'data')
@@ -81,7 +82,7 @@ export async function tryFindProjectListFromSlnFile(solution: string) {
         name: match[1],
         projectPath,
         fullPath,
-      }
+      } as Project
     })
     .filter((project) => project !== null)
 
